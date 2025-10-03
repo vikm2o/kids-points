@@ -1,0 +1,19 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+      - kids-points-data:/app/data
+    environment:
+      - NODE_ENV=development
+      - TERMINUS_API_URL=${TERMINUS_API_URL:-http://localhost:8080}
+    restart: unless-stopped
+
+volumes:
+  kids-points-data:
