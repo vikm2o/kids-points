@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { KidsDB, DevicesDB, getTodayRoutines, getNextRoutineItem } from '@/lib/database';
+import { KidsDB, DevicesDB, RewardsDB, getTodayRoutines, getNextRoutineItem, getTodayPoints, getTodayTotalPoints, getAvailablePoints } from '@/lib/database';
 import { TerminusPayload } from '@/types';
 import axios from 'axios';
 
@@ -23,7 +23,38 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the device associated with this kid
-    const device = kid.deviceId ? DevicesDB.getByFriendlyId(kid.deviceId) : null;
+    let device = kid.deviceId ? DevicesDB.getByFriendlyId(kid.deviceId) : null;
+
+    // If device not found in local DB, try refreshing from external API
+    if (!device && kid.deviceId) {
+      try {
+        const externalApiUrl = process.env.TERMINUS_API_URL || 'http://localhost:8080';
+        const response = await axios.get(`${externalApiUrl}/api/devices`, {
+          timeout: 10000,
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        const devicesPayload = Array.isArray(response.data)
+          ? response.data
+          : (Array.isArray(response.data?.data) ? response.data.data : []);
+
+        // Save all devices to local database
+        for (const deviceData of devicesPayload) {
+          const existingDevice = DevicesDB.getById(deviceData.id);
+          if (existingDevice) {
+            DevicesDB.update(deviceData.id, deviceData);
+          } else {
+            DevicesDB.create(deviceData);
+          }
+        }
+
+        // Try to get the device again after refresh
+        device = kid.deviceId ? DevicesDB.getByFriendlyId(kid.deviceId) : null;
+      } catch (error) {
+        console.error('Failed to refresh devices:', error);
+      }
+    }
+
     if (!device) {
       return NextResponse.json(
         { error: 'No device associated with this kid' },
@@ -33,19 +64,24 @@ export async function POST(request: NextRequest) {
 
     const routines = getTodayRoutines(kidId);
     const nextItem = getNextRoutineItem(kidId);
+    const rewards = RewardsDB.getAvailableForKid(kidId);
 
-    // Calculate today's points from routines
-    const totalPoints = routines.reduce((sum: number, r: any) => sum + (r.points || 0), 0);
-    const earnedPoints = routines.filter((r: any) => r.completed).reduce((sum: number, r: any) => sum + (r.points || 0), 0);
+    // Calculate points dynamically
+    const todayTotalPoints = getTodayTotalPoints(kidId); // Max possible points today
+    const todayEarnedPoints = getTodayPoints(kidId); // Points earned so far today
 
-    // Update kid's points in database to reflect today's values only
-    const updatedKid = KidsDB.update(kidId, {
-      dailyPoints: earnedPoints,
-      totalPoints: totalPoints
-    });
+    // Debug logging
+    console.log('=== DASHBOARD SYNC DEBUG ===');
+    console.log('Kid:', kid.name);
+    console.log('Lifetime Points:', kid.lifetimePoints);
+    console.log('Redeemed Points:', kid.redeemedPoints);
+    console.log('Today Total (max possible):', todayTotalPoints);
+    console.log('Today Earned (so far):', todayEarnedPoints);
+    console.log('Completed routines:', routines.filter(r => r.completed).map(r => ({ title: r.title, points: r.points })));
+    console.log('============================');
 
-    // Generate HTML content for the dashboard with updated values
-    const htmlContent = generateDashboardHTML(updatedKid || kid, routines, nextItem);
+    // Generate HTML content for the dashboard
+    const htmlContent = generateDashboardHTML(kid, routines, nextItem, rewards, todayTotalPoints, todayEarnedPoints);
 
     // Create screen - the /api/screens endpoint will handle playlist updates automatically
     const screenResponse = await createScreen(device, kid, htmlContent);
@@ -74,7 +110,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function generateDashboardHTML(kid: any, routines: any[], nextItem: any) {
+function generateDashboardHTML(kid: any, routines: any[], nextItem: any, rewards: any[], todayTotalPoints: number, todayEarnedPoints: number) {
   const now = new Date();
   const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -94,22 +130,46 @@ function generateDashboardHTML(kid: any, routines: any[], nextItem: any) {
     return `${hours12}:${paddedMins} ${period}`;
   };
 
+  // Get top 3 affordable rewards sorted by cost, or next 3 if none affordable
+  const availablePoints = kid.lifetimePoints - kid.redeemedPoints;
+  let topRewards = rewards
+    .filter((r: any) => r.pointsCost <= availablePoints)
+    .sort((a: any, b: any) => a.pointsCost - b.pointsCost)
+    .slice(0, 3);
+
+  // If no affordable rewards, show the 3 cheapest ones as goals
+  if (topRewards.length === 0) {
+    topRewards = rewards
+      .sort((a: any, b: any) => a.pointsCost - b.pointsCost)
+      .slice(0, 3);
+  }
+
   return `
 <div class="layout">
   <div>
     <h1>${kid.name} — ${dateStr}</h1>
   </div>
 
-  <h2>Summary</h2>
+  <h2>Summary &amp; Rewards</h2>
   <table class="table" data-table-limit="true">
+    <thead>
+      <tr>
+        <th><span class="title">Today</span></th>
+        <th><span class="title">Earned</span></th>
+        <th><span class="title">Lifetime</span></th>
+        ${topRewards.map((_: any, idx: number) => `<th><span class="title">Reward ${idx + 1}</span></th>`).join('')}
+      </tr>
+    </thead>
     <tbody>
       <tr>
-        <td><span class="title">Today Earned</span></td>
-        <td><span class="title">${kid.dailyPoints}</span></td>
-      </tr>
-      <tr>
-        <td><span class="title">Today Total</span></td>
-        <td><span class="title">${kid.totalPoints}</span></td>
+        <td><span class="value">${todayTotalPoints}</span></td>
+        <td><span class="value">${todayEarnedPoints}</span></td>
+        <td><span class="value">${kid.lifetimePoints}</span></td>
+        ${topRewards.length > 0 ? topRewards.map((reward: any) => `
+        <td><span class="title">${reward.title} (${reward.pointsCost})</span></td>
+        `).join('') : `
+        <td colspan="3"><span class="title">Keep earning!</span></td>
+        `}
       </tr>
     </tbody>
   </table>

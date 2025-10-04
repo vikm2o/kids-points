@@ -11,27 +11,29 @@ export async function POST(
       return NextResponse.json({ error: 'Routine not found' }, { status: 404 });
     }
 
-    // Toggle completion
+    // Toggle completion and track completion date
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD format
     const updatedRoutine = RoutinesDB.update(params.id, {
-      completed: !routine.completed
+      completed: !routine.completed,
+      completedDate: !routine.completed ? today : null
     });
 
     if (!updatedRoutine) {
       return NextResponse.json({ error: 'Failed to update routine' }, { status: 500 });
     }
 
-    // Update kid's points
+    // Update kid's lifetime points
     const kid = KidsDB.getById(routine.kidId);
     if (kid) {
       if (updatedRoutine.completed) {
+        // Add points to lifetime when completing
         KidsDB.update(kid.id, {
-          dailyPoints: kid.dailyPoints + routine.points,
-          totalPoints: kid.totalPoints + routine.points
+          lifetimePoints: kid.lifetimePoints + routine.points
         });
       } else {
+        // Remove points from lifetime when uncompleting
         KidsDB.update(kid.id, {
-          dailyPoints: Math.max(0, kid.dailyPoints - routine.points),
-          totalPoints: Math.max(0, kid.totalPoints - routine.points)
+          lifetimePoints: Math.max(0, kid.lifetimePoints - routine.points)
         });
       }
     }

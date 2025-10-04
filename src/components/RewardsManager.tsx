@@ -135,9 +135,39 @@ export function RewardsManager({ kids }: RewardsManagerProps) {
               type="text"
               value={formData.icon}
               onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
-              className="w-full border rounded px-3 py-2"
+              className="w-full border rounded px-3 py-2 mb-2"
               placeholder="🎁"
             />
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">Or upload an image:</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                      setFormData({ ...formData, icon: reader.result as string });
+                    };
+                    reader.readAsDataURL(file);
+                  }
+                }}
+                className="w-full text-sm"
+              />
+              {formData.icon && formData.icon.startsWith('data:') && (
+                <div className="mt-2 flex items-center gap-2">
+                  <img src={formData.icon} alt="Icon preview" className="w-12 h-12 rounded object-cover border" />
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, icon: '🎁' })}
+                    className="text-xs text-red-600 hover:text-red-800"
+                  >
+                    Remove image
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Points Cost *</label>
@@ -213,7 +243,13 @@ export function RewardsManager({ kids }: RewardsManagerProps) {
             className={`border rounded-lg p-4 ${reward.available ? 'bg-white' : 'bg-gray-100'}`}
           >
             <div className="flex items-start justify-between mb-2">
-              <div className="text-3xl">{reward.icon || '🎁'}</div>
+              <div className="text-3xl">
+                {reward.icon && reward.icon.startsWith('data:') ? (
+                  <img src={reward.icon} alt={reward.title} className="w-12 h-12 rounded object-cover" />
+                ) : (
+                  <span>{reward.icon || '🎁'}</span>
+                )}
+              </div>
               <div className="flex gap-1">
                 <button
                   onClick={() => handleEdit(reward)}

@@ -82,6 +82,35 @@ export function Dashboard() {
     }
   };
 
+  const handleReducePoints = async (routineId: string, reason: string) => {
+    if (!currentKid) return;
+
+    try {
+      const response = await fetch(`/api/routines/${routineId}/reduce`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason })
+      });
+
+      if (response.ok) {
+        // Refresh data from API
+        const refreshedKids = await getAllKids();
+        const refreshedCurrentKid = refreshedKids.find(k => k.id === currentKid.id);
+        const refreshedRoutines = await getTodayRoutines(currentKid.id);
+        const refreshedNextItem = await getNextRoutineItem(currentKid.id);
+
+        setKids(refreshedKids);
+        if (refreshedCurrentKid) {
+          setCurrentKid(refreshedCurrentKid);
+        }
+        setRoutines(refreshedRoutines);
+        setNextItem(refreshedNextItem);
+      }
+    } catch (error) {
+      console.error('Failed to reduce points:', error);
+    }
+  };
+
   return (
     <div className="min-h-screen p-4 trml:p-6">
       <div className="max-w-6xl mx-auto">
@@ -125,7 +154,13 @@ export function Dashboard() {
                   : 'border-gray-200 hover:border-gray-300'
               }`}
             >
-              <div className="text-2xl mb-1">{kid.avatar}</div>
+              <div className="text-2xl mb-1 flex justify-center">
+                {kid.avatar && kid.avatar.startsWith('data:') ? (
+                  <img src={kid.avatar} alt={kid.name} className="w-12 h-12 rounded-full object-cover" />
+                ) : (
+                  <span>{kid.avatar}</span>
+                )}
+              </div>
               <div className="text-sm font-medium">{kid.name}</div>
             </button>
           ))}
@@ -145,6 +180,7 @@ export function Dashboard() {
                 routines={routines}
                 nextItem={nextItem}
                 onToggleComplete={toggleRoutineComplete}
+                onReducePoints={handleReducePoints}
               />
             </div>
           </div>

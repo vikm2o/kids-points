@@ -229,7 +229,13 @@ export function DeviceAssignments({ kids, onSyncKid, onSyncDashboard }: DeviceAs
               <div key={kid.id} className="border rounded-lg p-4 bg-green-50 border-green-200">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="text-2xl">{kid.avatar}</div>
+                    <div className="text-2xl flex-shrink-0">
+                      {kid.avatar && kid.avatar.startsWith('data:') ? (
+                        <img src={kid.avatar} alt={kid.name} className="w-10 h-10 rounded-full object-cover" />
+                      ) : (
+                        <span>{kid.avatar}</span>
+                      )}
+                    </div>
                     <div>
                       <div className="font-medium">{kid.name}</div>
                       <div className="text-sm text-gray-600 flex items-center gap-1">
@@ -270,6 +276,14 @@ export function DeviceAssignments({ kids, onSyncKid, onSyncDashboard }: DeviceAs
                       )}
                       Dashboard
                     </button>
+                    <button
+                      onClick={() => handleAssociateDevice(kid.id, '')}
+                      disabled={associatingKid === kid.id}
+                      className="bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white px-3 py-1 rounded text-sm flex items-center gap-1"
+                      title="Unassign device from this kid"
+                    >
+                      <Unlink className="w-3 h-3" />
+                    </button>
                   </div>
                 </div>
               </div>
@@ -287,7 +301,13 @@ export function DeviceAssignments({ kids, onSyncKid, onSyncDashboard }: DeviceAs
               <div key={kid.id} className="border rounded-lg p-4 bg-yellow-50 border-yellow-200">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="text-2xl">{kid.avatar}</div>
+                    <div className="text-2xl flex-shrink-0">
+                      {kid.avatar && kid.avatar.startsWith('data:') ? (
+                        <img src={kid.avatar} alt={kid.name} className="w-10 h-10 rounded-full object-cover" />
+                      ) : (
+                        <span>{kid.avatar}</span>
+                      )}
+                    </div>
                     <div>
                       <div className="font-medium">{kid.name}</div>
                       <div className="text-sm text-yellow-700">No device assigned</div>

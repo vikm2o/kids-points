@@ -7,9 +7,22 @@ export async function PUT(
 ) {
   try {
     const updates = await request.json();
+    const currentRoutine = RoutinesDB.getById(params.id);
+
+    if (!currentRoutine) {
+      return NextResponse.json({ error: 'Routine not found' }, { status: 404 });
+    }
+
+    // Check if task was completed on a previous day - if so, reset completion
+    const today = new Date().toISOString().slice(0, 10);
+    if (currentRoutine.completed && currentRoutine.completedDate && currentRoutine.completedDate !== today) {
+      updates.completed = false;
+      updates.completedDate = null;
+    }
+
     const updatedRoutine = RoutinesDB.update(params.id, updates);
     if (!updatedRoutine) {
-      return NextResponse.json({ error: 'Routine not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Failed to update routine' }, { status: 404 });
     }
     // Trigger device sync for kid after update
     try { await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/terminus`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kidId: updatedRoutine.kidId }) }); } catch (e) {}

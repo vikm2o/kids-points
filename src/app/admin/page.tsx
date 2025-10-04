@@ -10,6 +10,7 @@ import { DaySelector } from '@/components/DaySelector';
 import { DeviceSettings } from '@/components/DeviceSettings';
 import { DeviceAssignments } from '@/components/DeviceAssignments';
 import { RewardsManager } from '@/components/RewardsManager';
+import { PointsAdjustment } from '@/components/PointsAdjustment';
 import { isAuthenticated, logout } from '@/lib/auth';
 
 export default function AdminPage() {
@@ -187,6 +188,46 @@ export default function AdminPage() {
           </h1>
           <div className="flex gap-3">
             <button
+              onClick={async () => {
+                if (confirm('Reset daily routines? This will uncheck all recurring tasks.')) {
+                  try {
+                    const response = await fetch('/api/admin/reset-daily-routines', { method: 'POST' });
+                    if (response.ok) {
+                      alert('Daily routines reset!');
+                      window.location.reload();
+                    }
+                  } catch (error) {
+                    console.error('Failed to reset routines:', error);
+                  }
+                }
+              }}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+              title="Reset daily routines (uncheck all recurring tasks)"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Reset Daily
+            </button>
+            <button
+              onClick={async () => {
+                if (confirm('Reset ALL kids points to 0? This will clear lifetime and redeemed points.')) {
+                  try {
+                    const response = await fetch('/api/admin/reset-all-points', { method: 'POST' });
+                    if (response.ok) {
+                      alert('All points reset to 0!');
+                      window.location.reload();
+                    }
+                  } catch (error) {
+                    console.error('Failed to reset points:', error);
+                  }
+                }
+              }}
+              className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+              title="Reset all kids points to 0"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Reset Points
+            </button>
+            <button
               onClick={cleanupOldScreens}
               className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
               title="Delete screens created before today"
@@ -232,6 +273,9 @@ export default function AdminPage() {
         {/* Rewards Management */}
         <RewardsManager kids={kids} />
 
+        {/* Lifetime Points Adjustment */}
+        <PointsAdjustment kids={kids} onAdjustment={loadData} />
+
         {/* Kid Selector for Routines */}
         {kids.length > 0 && (
           <div className="bg-white rounded-lg shadow p-6 mb-6">
@@ -247,7 +291,13 @@ export default function AdminPage() {
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
-                  <div className="text-3xl mb-2">{kid.avatar}</div>
+                  <div className="text-3xl mb-2 flex justify-center">
+                    {kid.avatar && kid.avatar.startsWith('data:') ? (
+                      <img src={kid.avatar} alt={kid.name} className="w-12 h-12 rounded-full object-cover" />
+                    ) : (
+                      <span>{kid.avatar}</span>
+                    )}
+                  </div>
                   <div className="font-medium">{kid.name}</div>
                 </button>
               ))}
@@ -397,13 +447,41 @@ function RoutineForm({ routine, kidId, onSave, onCancel }: RoutineFormProps) {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Override Date (optional)</label>
-            <input
-              type="date"
-              value={formData.dateOverride}
-              onChange={(e) => setFormData(prev => ({ ...prev, dateOverride: e.target.value }))}
-              className="w-full p-2 border rounded"
-            />
+            <label className="block text-sm font-medium mb-1">
+              Override Date (optional)
+              <span className="text-xs text-gray-500 ml-2">For one-time tasks on specific date</span>
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="date"
+                value={formData.dateOverride}
+                onChange={(e) => {
+                  const newValue = e.target.value;
+                  setFormData(prev => ({
+                    ...prev,
+                    dateOverride: newValue,
+                    // Clear days of week if date override is set
+                    daysOfWeek: newValue ? [] : prev.daysOfWeek
+                  }));
+                }}
+                className="flex-1 p-2 border rounded"
+              />
+              {formData.dateOverride && (
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({
+                    ...prev,
+                    dateOverride: '',
+                    // Restore default weekdays when clearing
+                    daysOfWeek: [1, 2, 3, 4, 5]
+                  }))}
+                  className="px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded text-sm"
+                  title="Clear override date"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -429,13 +507,20 @@ function RoutineForm({ routine, kidId, onSave, onCancel }: RoutineFormProps) {
               required
             />
           </div>
-          <div>
-            <DaySelector
-              selectedDays={formData.daysOfWeek}
-              onChange={(days) => setFormData(prev => ({ ...prev, daysOfWeek: days }))}
-              label="Days of Week"
-            />
-          </div>
+          {!formData.dateOverride && (
+            <div>
+              <DaySelector
+                selectedDays={formData.daysOfWeek}
+                onChange={(days) => setFormData(prev => ({ ...prev, daysOfWeek: days }))}
+                label="Days of Week"
+              />
+            </div>
+          )}
+          {formData.dateOverride && (
+            <div className="flex items-center text-sm text-gray-600 bg-blue-50 p-3 rounded">
+              <span>📅 One-time task on {formData.dateOverride}</span>
+            </div>
+          )}
         </div>
 
         <div className="flex gap-2">

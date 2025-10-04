@@ -13,7 +13,13 @@ export function KidCard({ kid, nextItem }: KidCardProps) {
     <div className="bg-white rounded-2xl shadow-lg p-6 trml:p-8 dashboard-card">
       {/* Kid Info */}
       <div className="text-center mb-6">
-        <div className="text-6xl trml:text-8xl mb-3">{kid.avatar}</div>
+        <div className="text-6xl trml:text-8xl mb-3 flex justify-center">
+          {kid.avatar && kid.avatar.startsWith('data:') ? (
+            <img src={kid.avatar} alt={kid.name} className="w-24 h-24 trml:w-32 trml:h-32 rounded-full object-cover" />
+          ) : (
+            <span>{kid.avatar}</span>
+          )}
+        </div>
         <h2 className="text-2xl trml:text-3xl font-bold text-gray-800 mb-2">
           {kid.name}
         </h2>
@@ -26,7 +32,7 @@ export function KidCard({ kid, nextItem }: KidCardProps) {
             <div className="flex items-center gap-2">
               <Star className="w-6 h-6 text-yellow-600" />
               <span className="text-lg font-medium text-yellow-800">
-                Total Points
+                Lifetime Points
               </span>
             </div>
             <span className="text-2xl trml:text-3xl font-bold text-yellow-800">

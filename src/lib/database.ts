@@ -40,8 +40,8 @@ function initializeTables() {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       avatar TEXT,
-      total_points INTEGER DEFAULT 0,
-      daily_points INTEGER DEFAULT 0,
+      lifetime_points INTEGER DEFAULT 0,
+      redeemed_points INTEGER DEFAULT 0,
       device_id TEXT,
       access_token TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -49,9 +49,21 @@ function initializeTables() {
     )
   `);
 
-  // Add access_token column if it doesn't exist (for existing databases)
+  // Add columns if they don't exist (for existing databases)
   try {
     db.exec(`ALTER TABLE kids ADD COLUMN access_token TEXT`);
+  } catch (error) {
+    // Column might already exist, ignore the error
+  }
+
+  try {
+    db.exec(`ALTER TABLE kids ADD COLUMN lifetime_points INTEGER DEFAULT 0`);
+  } catch (error) {
+    // Column might already exist, ignore the error
+  }
+
+  try {
+    db.exec(`ALTER TABLE kids ADD COLUMN redeemed_points INTEGER DEFAULT 0`);
   } catch (error) {
     // Column might already exist, ignore the error
   }
@@ -83,6 +95,11 @@ function initializeTables() {
   }
   try {
     db.exec(`ALTER TABLE routines ADD COLUMN date_override TEXT`);
+  } catch (e) {
+    // ignore if exists
+  }
+  try {
+    db.exec(`ALTER TABLE routines ADD COLUMN completed_date TEXT`);
   } catch (e) {
     // ignore if exists
   }
@@ -168,12 +185,12 @@ function seedDatabase() {
 
     // Insert sample kids
     const insertKid = db.prepare(`
-      INSERT INTO kids (id, name, avatar, total_points, daily_points, device_id)
+      INSERT INTO kids (id, name, avatar, lifetime_points, redeemed_points, device_id)
       VALUES (?, ?, ?, ?, ?, ?)
     `);
 
-    insertKid.run('1', 'Emma', '👧', 145, 25, 'trml_emma');
-    insertKid.run('2', 'Alex', '👦', 128, 30, 'trml_alex');
+    insertKid.run('1', 'Emma', '👧', 0, 0, 'trml_emma');
+    insertKid.run('2', 'Alex', '👦', 0, 0, 'trml_alex');
 
     // Insert sample routines
     const insertRoutine = db.prepare(`
@@ -195,6 +212,19 @@ function seedDatabase() {
     // Alex's routines
     insertRoutine.run('10', 'Morning Exercise', '10 minutes of stretching or light exercise', 8, '07:30', false, '2', JSON.stringify([1, 3, 5]));
 
+    // Insert sample rewards
+    const insertReward = db.prepare(`
+      INSERT INTO rewards (id, title, description, points_cost, icon, available, kid_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    insertReward.run('r1', 'Ice Cream', 'Enjoy your favorite ice cream', 10, '🍦', 1, null);
+    insertReward.run('r2', 'Extra Screen Time', '30 minutes extra screen time', 25, '📱', 1, null);
+    insertReward.run('r3', 'Movie Night', 'Pick the movie for family movie night', 40, '🎬', 1, null);
+    insertReward.run('r4', 'Pizza Party', 'Pizza for dinner', 50, '🍕', 1, null);
+    insertReward.run('r5', 'Toy Store Trip', 'Choose a small toy', 75, '🧸', 1, null);
+    insertReward.run('r6', 'Sleepover', 'Have a friend sleep over', 100, '🏠', 1, null);
+
     console.log('Database seeded successfully!');
   }
 }
@@ -208,8 +238,8 @@ export const KidsDB = {
       id: row.id,
       name: row.name,
       avatar: row.avatar,
-      totalPoints: row.total_points,
-      dailyPoints: row.daily_points,
+      lifetimePoints: row.lifetime_points || 0,
+      redeemedPoints: row.redeemed_points || 0,
       deviceId: row.device_id,
       accessToken: row.access_token
     }));
@@ -224,8 +254,8 @@ export const KidsDB = {
       id: row.id,
       name: row.name,
       avatar: row.avatar,
-      totalPoints: row.total_points,
-      dailyPoints: row.daily_points,
+      lifetimePoints: row.lifetime_points || 0,
+      redeemedPoints: row.redeemed_points || 0,
       deviceId: row.device_id,
       accessToken: row.access_token
     };
@@ -236,9 +266,9 @@ export const KidsDB = {
     const id = Date.now().toString();
 
     db.prepare(`
-      INSERT INTO kids (id, name, avatar, total_points, daily_points, device_id, access_token)
+      INSERT INTO kids (id, name, avatar, lifetime_points, redeemed_points, device_id, access_token)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(id, kid.name, kid.avatar, kid.totalPoints, kid.dailyPoints, kid.deviceId, kid.accessToken);
+    `).run(id, kid.name, kid.avatar, kid.lifetimePoints, kid.redeemedPoints, kid.deviceId, kid.accessToken);
 
     return { id, ...kid };
   },
@@ -252,9 +282,9 @@ export const KidsDB = {
 
     db.prepare(`
       UPDATE kids
-      SET name = ?, avatar = ?, total_points = ?, daily_points = ?, device_id = ?, access_token = ?, updated_at = CURRENT_TIMESTAMP
+      SET name = ?, avatar = ?, lifetime_points = ?, redeemed_points = ?, device_id = ?, access_token = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `).run(updated.name, updated.avatar, updated.totalPoints, updated.dailyPoints, updated.deviceId, updated.accessToken, id);
+    `).run(updated.name, updated.avatar, updated.lifetimePoints, updated.redeemedPoints, updated.deviceId, updated.accessToken, id);
 
     return updated;
   },
@@ -391,13 +421,27 @@ export function getTodayRoutines(kidId: string): RoutineItem[] {
   const todayDow = now.getDay();
   const todayISO = now.toISOString().slice(0, 10);
   const routines = RoutinesDB.getByKidId(kidId);
-  const overrides = routines.filter(r => r.dateOverride === todayISO);
-  if (overrides.length > 0) {
-    return overrides.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
-  }
-  return routines
-    .filter(routine => routine.daysOfWeek.includes(todayDow))
-    .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+
+  // Filter to only include:
+  // 1. Tasks with dateOverride === today, OR
+  // 2. Tasks without dateOverride that are scheduled for today's day of week
+  const todayRoutines = routines.filter(routine => {
+    // If it has a date override, only show if it matches today
+    if (routine.dateOverride) {
+      return routine.dateOverride === todayISO;
+    }
+    // Otherwise, check if today's day of week is in the schedule
+    return routine.daysOfWeek.includes(todayDow);
+  });
+
+  return todayRoutines.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+}
+
+// Reset all routines completion status (call this at start of new day)
+export function resetDailyRoutines() {
+  const db = getDatabase();
+  db.prepare('UPDATE routines SET completed = FALSE WHERE date_override IS NULL').run();
+  console.log('Daily routines reset for new day');
 }
 
 export function getNextRoutineItem(kidId: string): RoutineItem | null {
@@ -410,6 +454,27 @@ export function getNextRoutineItem(kidId: string): RoutineItem | null {
     .sort((a, b) => a.time.localeCompare(b.time))[0];
 
   return nextItem || null;
+}
+
+// Calculate today's earned points (completed tasks)
+export function getTodayPoints(kidId: string): number {
+  const routines = getTodayRoutines(kidId);
+  return routines
+    .filter(r => r.completed)
+    .reduce((sum, r) => sum + (r.points || 0), 0);
+}
+
+// Calculate total possible points for today (all tasks)
+export function getTodayTotalPoints(kidId: string): number {
+  const routines = getTodayRoutines(kidId);
+  return routines.reduce((sum, r) => sum + (r.points || 0), 0);
+}
+
+// Calculate available points (lifetime - redeemed)
+export function getAvailablePoints(kidId: string): number {
+  const kid = KidsDB.getById(kidId);
+  if (!kid) return 0;
+  return Math.max(0, kid.lifetimePoints - kid.redeemedPoints);
 }
 
 // Database operations for Devices

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { RedemptionsDB, RewardsDB, KidsDB } from '@/lib/database';
+import { RedemptionsDB, RewardsDB, KidsDB, getAvailablePoints } from '@/lib/database';
 
 export async function GET(request: NextRequest) {
   try {
@@ -60,7 +60,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if kid has enough points
-    if (kid.totalPoints < reward.pointsCost) {
+    const availablePoints = getAvailablePoints(kidId);
+    if (availablePoints < reward.pointsCost) {
       return NextResponse.json(
         { error: 'Not enough points' },
         { status: 400 }
@@ -75,9 +76,9 @@ export async function POST(request: NextRequest) {
       status: 'pending'
     });
 
-    // Deduct points from kid
+    // Add to redeemed points
     KidsDB.update(kidId, {
-      totalPoints: kid.totalPoints - reward.pointsCost
+      redeemedPoints: kid.redeemedPoints + reward.pointsCost
     });
 
     return NextResponse.json(redemption, { status: 201 });

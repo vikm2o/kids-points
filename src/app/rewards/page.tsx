@@ -174,7 +174,13 @@ export default function RewardsPage() {
                     canAfford ? 'ring-2 ring-green-400' : 'opacity-75'
                   }`}
                 >
-                  <div className="text-5xl mb-4 text-center">{reward.icon || '🎁'}</div>
+                  <div className="text-5xl mb-4 text-center flex justify-center">
+                    {reward.icon && reward.icon.startsWith('data:') ? (
+                      <img src={reward.icon} alt={reward.title} className="w-16 h-16 rounded object-cover" />
+                    ) : (
+                      <span>{reward.icon || '🎁'}</span>
+                    )}
+                  </div>
                   <h3 className="text-xl font-bold mb-2 text-center">{reward.title}</h3>
                   {reward.description && (
                     <p className="text-gray-600 text-sm mb-4 text-center">{reward.description}</p>

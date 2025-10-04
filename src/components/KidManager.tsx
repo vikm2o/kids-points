@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Kid } from '@/types';
 import { updateKid, addKid, deleteKid } from '@/lib/data';
-import { Plus, Edit2, Trash2, Save, X, User, Monitor } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, X, User, Monitor, RefreshCw } from 'lucide-react';
 
 interface KidManagerProps {
   kids: Kid[];
@@ -45,6 +45,22 @@ export function KidManager({ kids, onKidsUpdate }: KidManagerProps) {
     }
   };
 
+  const handleRecalculatePoints = async (kidId: string) => {
+    if (confirm('This will recalculate lifetime points based on today\'s completed tasks. Continue?')) {
+      try {
+        const response = await fetch(`/api/kids/${kidId}/recalculate-points`, {
+          method: 'POST'
+        });
+        if (response.ok) {
+          // Refresh the kids list
+          window.location.reload();
+        }
+      } catch (error) {
+        console.error('Failed to recalculate points:', error);
+      }
+    }
+  };
+
   return (
     <div className="bg-white rounded-lg shadow p-6 mb-6">
       <div className="flex items-center justify-between mb-6">
@@ -65,7 +81,13 @@ export function KidManager({ kids, onKidsUpdate }: KidManagerProps) {
         {kids.map(kid => (
           <div key={kid.id} className="border rounded-lg p-4">
             <div className="text-center mb-4">
-              <div className="text-4xl mb-2">{kid.avatar}</div>
+              <div className="text-4xl mb-2 flex justify-center">
+                {kid.avatar && kid.avatar.startsWith('data:') ? (
+                  <img src={kid.avatar} alt={kid.name} className="w-16 h-16 rounded-full object-cover" />
+                ) : (
+                  <span>{kid.avatar}</span>
+                )}
+              </div>
               <h3 className="font-semibold text-lg">{kid.name}</h3>
               <div className="text-sm text-gray-600 mt-2">
                 <div>Total: {kid.totalPoints} points</div>
@@ -78,20 +100,30 @@ export function KidManager({ kids, onKidsUpdate }: KidManagerProps) {
                 )}
               </div>
             </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setEditingKid(kid)}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded text-sm flex items-center justify-center gap-1"
-              >
-                <Edit2 className="w-3 h-3" />
-                Edit
-              </button>
-              <button
-                onClick={() => handleDeleteKid(kid.id)}
-                className="flex-1 bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded text-sm flex items-center justify-center gap-1"
-              >
+            <div className="flex flex-col gap-2">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setEditingKid(kid)}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded text-sm flex items-center justify-center gap-1"
+                >
+                  <Edit2 className="w-3 h-3" />
+                  Edit
+                </button>
+                <button
+                  onClick={() => handleDeleteKid(kid.id)}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded text-sm flex items-center justify-center gap-1"
+                >
                 <Trash2 className="w-3 h-3" />
                 Delete
+              </button>
+              </div>
+              <button
+                onClick={() => handleRecalculatePoints(kid.id)}
+                className="w-full bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded text-sm flex items-center justify-center gap-1"
+                title="Recalculate lifetime points from today's completed tasks"
+              >
+                <RefreshCw className="w-3 h-3" />
+                Recalc Points
               </button>
             </div>
           </div>
@@ -123,8 +155,8 @@ function KidForm({ kid, onSave, onCancel }: KidFormProps) {
   const [formData, setFormData] = useState({
     name: kid?.name || '',
     avatar: kid?.avatar || '👶',
-    totalPoints: kid?.totalPoints || 0,
-    dailyPoints: kid?.dailyPoints || 0,
+    lifetimePoints: kid?.lifetimePoints || 0,
+    redeemedPoints: kid?.redeemedPoints || 0,
     deviceId: kid?.deviceId || '',
     accessToken: kid?.accessToken || '',
   });
@@ -169,7 +201,7 @@ function KidForm({ kid, onSave, onCancel }: KidFormProps) {
 
           <div>
             <label className="block text-sm font-medium mb-1">Avatar</label>
-            <div className="grid grid-cols-5 gap-2">
+            <div className="grid grid-cols-5 gap-2 mb-3">
               {avatarOptions.map(emoji => (
                 <button
                   key={emoji}
@@ -182,6 +214,36 @@ function KidForm({ kid, onSave, onCancel }: KidFormProps) {
                   {emoji}
                 </button>
               ))}
+            </div>
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">Or upload an image:</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                      setFormData(prev => ({ ...prev, avatar: reader.result as string }));
+                    };
+                    reader.readAsDataURL(file);
+                  }
+                }}
+                className="w-full text-sm"
+              />
+              {formData.avatar && !avatarOptions.includes(formData.avatar) && (
+                <div className="mt-2 flex items-center gap-2">
+                  <img src={formData.avatar} alt="Avatar preview" className="w-16 h-16 rounded-full object-cover border-2 border-blue-500" />
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, avatar: '👶' }))}
+                    className="text-xs text-red-600 hover:text-red-800"
+                  >
+                    Remove image
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -211,29 +273,6 @@ function KidForm({ kid, onSave, onCancel }: KidFormProps) {
               <p className="text-xs text-gray-600 mt-1">
                 Optional: Terminus API access token for this device
               </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Total Points</label>
-              <input
-                type="number"
-                value={formData.totalPoints}
-                onChange={(e) => setFormData(prev => ({ ...prev, totalPoints: parseInt(e.target.value) || 0 }))}
-                className="w-full p-2 border rounded"
-                min="0"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Daily Points</label>
-              <input
-                type="number"
-                value={formData.dailyPoints}
-                onChange={(e) => setFormData(prev => ({ ...prev, dailyPoints: parseInt(e.target.value) || 0 }))}
-                className="w-full p-2 border rounded"
-                min="0"
-              />
             </div>
           </div>
 

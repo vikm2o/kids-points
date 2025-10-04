@@ -2,8 +2,8 @@ export interface Kid {
   id: string;
   name: string;
   avatar?: string;
-  totalPoints: number;
-  dailyPoints: number;
+  lifetimePoints: number; // Total points earned all time (includes redeemed)
+  redeemedPoints: number; // Total points spent on rewards
   deviceId?: string; // Optional Terminus device ID for this kid
   accessToken?: string; // Optional Terminus access token for this kid's device
 }
@@ -16,6 +16,7 @@ export interface RoutineItem {
   time: string; // HH:MM format
   endTime?: string; // HH:MM format (optional)
   completed: boolean;
+  completedDate?: string; // YYYY-MM-DD - date when task was completed
   kidId: string;
   daysOfWeek: number[]; // Array of 0-6 (Sunday-Saturday), e.g., [1,2,3,4,5] for weekdays
   dateOverride?: string; // YYYY-MM-DD for custom one-off routine on a date

@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { KidsDB } from '@/lib/database';
+import { KidsDB, getTodayPoints, getAvailablePoints } from '@/lib/database';
 
 export async function GET() {
   try {
     const kids = KidsDB.getAll();
-    return NextResponse.json(kids);
+    // Add calculated points to each kid
+    const kidsWithPoints = kids.map(kid => ({
+      ...kid,
+      dailyPoints: getTodayPoints(kid.id),
+      totalPoints: getAvailablePoints(kid.id)
+    }));
+    return NextResponse.json(kidsWithPoints);
   } catch (error) {
     console.error('Failed to get kids:', error);
     return NextResponse.json(

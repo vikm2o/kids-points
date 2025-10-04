@@ -1,17 +1,21 @@
 'use client';
 
 import { RoutineItem } from '@/types';
-import { CheckCircle, Circle, Clock, Star } from 'lucide-react';
+import { CheckCircle, Circle, Clock, Star, Minus } from 'lucide-react';
+import { useState } from 'react';
 
 interface RoutineListProps {
   routines: RoutineItem[];
   nextItem: RoutineItem | null;
   onToggleComplete: (routineId: string) => void;
+  onReducePoints?: (routineId: string, reason: string) => void;
 }
 
-export function RoutineList({ routines, nextItem, onToggleComplete }: RoutineListProps) {
+export function RoutineList({ routines, nextItem, onToggleComplete, onReducePoints }: RoutineListProps) {
   const now = new Date();
   const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+  const [showReduceModal, setShowReduceModal] = useState<string | null>(null);
+  const [reduceReason, setReduceReason] = useState('');
 
   const getItemStatus = (item: RoutineItem) => {
     if (item.completed) return 'completed';
@@ -59,14 +63,16 @@ export function RoutineList({ routines, nextItem, onToggleComplete }: RoutineLis
               <div
                 key={item.id}
                 className={`
-                  border rounded-xl p-4 trml:p-5 transition-all cursor-pointer
+                  border rounded-xl p-4 trml:p-5 transition-all
                   hover:shadow-md ${styles} todo-item
                 `}
-                onClick={() => onToggleComplete(item.id)}
               >
                 <div className="flex items-center gap-4">
                   {/* Completion Status */}
-                  <div className="flex-shrink-0">
+                  <div
+                    className="flex-shrink-0 cursor-pointer"
+                    onClick={() => onToggleComplete(item.id)}
+                  >
                     {item.completed ? (
                       <CheckCircle className="w-6 h-6 trml:w-8 trml:h-8 text-green-600" />
                     ) : (
@@ -75,7 +81,7 @@ export function RoutineList({ routines, nextItem, onToggleComplete }: RoutineLis
                   </div>
 
                   {/* Content */}
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0" onClick={() => onToggleComplete(item.id)}>
                     <div className="flex items-center justify-between mb-1">
                       <h4 className={`
                         text-lg trml:text-xl font-semibold
@@ -111,12 +117,68 @@ export function RoutineList({ routines, nextItem, onToggleComplete }: RoutineLis
                       </span>
                     </div>
                   </div>
+
+                  {/* Reduce Points Button - only show for completed items */}
+                  {item.completed && onReducePoints && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowReduceModal(item.id);
+                      }}
+                      className="flex-shrink-0 p-2 rounded-lg bg-orange-100 hover:bg-orange-200 text-orange-700 transition-colors"
+                      title="Reduce points for this task"
+                    >
+                      <Minus className="w-5 h-5" />
+                    </button>
+                  )}
                 </div>
               </div>
             );
           })
         )}
       </div>
+
+      {/* Reduce Points Modal */}
+      {showReduceModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Reduce Points</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Explain why points should be reduced for this task:
+            </p>
+            <textarea
+              value={reduceReason}
+              onChange={(e) => setReduceReason(e.target.value)}
+              className="w-full p-2 border rounded mb-4 h-24"
+              placeholder="e.g., Task not done properly, needed help, incomplete..."
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  if (onReducePoints && reduceReason.trim()) {
+                    onReducePoints(showReduceModal, reduceReason);
+                    setShowReduceModal(null);
+                    setReduceReason('');
+                  }
+                }}
+                disabled={!reduceReason.trim()}
+                className="flex-1 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white px-4 py-2 rounded"
+              >
+                Reduce Points
+              </button>
+              <button
+                onClick={() => {
+                  setShowReduceModal(null);
+                  setReduceReason('');
+                }}
+                className="flex-1 bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Summary */}
       <div className="mt-6 pt-4 border-t border-gray-200">
