@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { KidsDB, DevicesDB, RewardsDB, getTodayRoutines, getNextRoutineItem, getTodayPoints, getTodayTotalPoints, getAvailablePoints } from '@/lib/database';
+import { KidsDB, DevicesDB, RewardsDB, getTodayRoutines, getNextRoutineItem, getTodayPoints, getTodayTotalPoints, getAvailablePoints, checkAndResetIfNeeded } from '@/lib/database';
 import { TerminusPayload } from '@/types';
 import axios from 'axios';
 
 export async function POST(request: NextRequest) {
   try {
+    // Check and reset routines if it's a new day
+    checkAndResetIfNeeded();
+
     const { kidId } = await request.json();
 
     if (!kidId) {

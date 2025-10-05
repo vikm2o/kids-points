@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { RoutinesDB, getTodayRoutines, getNextRoutineItem } from '@/lib/database';
+import { RoutinesDB, getTodayRoutines, getNextRoutineItem, checkAndResetIfNeeded } from '@/lib/database';
 
 export async function GET(request: NextRequest) {
   try {
+    // Check and reset routines if it's a new day
+    checkAndResetIfNeeded();
+
     const { searchParams } = new URL(request.url);
     const kidId = searchParams.get('kidId');
     const today = searchParams.get('today');

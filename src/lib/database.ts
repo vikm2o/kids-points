@@ -440,8 +440,40 @@ export function getTodayRoutines(kidId: string): RoutineItem[] {
 // Reset all routines completion status (call this at start of new day)
 export function resetDailyRoutines() {
   const db = getDatabase();
-  db.prepare('UPDATE routines SET completed = FALSE WHERE date_override IS NULL').run();
+  db.prepare('UPDATE routines SET completed = FALSE, completed_date = NULL WHERE date_override IS NULL').run();
   console.log('Daily routines reset for new day');
+}
+
+// Check if we need to reset routines and do so if it's a new day
+export function checkAndResetIfNeeded() {
+  const db = getDatabase();
+
+  // Create settings table if it doesn't exist
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+  // Get last reset date
+  const lastResetRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('last_reset_date') as { value: string } | undefined;
+  const lastResetDate = lastResetRow?.value;
+
+  // If it's a new day, reset routines
+  if (lastResetDate !== today) {
+    console.log(`New day detected (last reset: ${lastResetDate || 'never'}, today: ${today}). Resetting daily routines...`);
+    resetDailyRoutines();
+
+    // Update last reset date
+    db.prepare(`
+      INSERT OR REPLACE INTO settings (key, value, updated_at)
+      VALUES (?, ?, CURRENT_TIMESTAMP)
+    `).run('last_reset_date', today);
+  }
 }
 
 export function getNextRoutineItem(kidId: string): RoutineItem | null {
@@ -704,12 +736,15 @@ export const RewardsDB = {
     const db = getDatabase();
     const id = Date.now().toString();
 
+    // Convert empty string to null for kid_id
+    const kidId = reward.kidId && reward.kidId.trim() !== '' ? reward.kidId : null;
+
     db.prepare(`
       INSERT INTO rewards (id, title, description, points_cost, icon, available, kid_id)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(id, reward.title, reward.description, reward.pointsCost, reward.icon, reward.available ? 1 : 0, reward.kidId);
+    `).run(id, reward.title, reward.description, reward.pointsCost, reward.icon, reward.available ? 1 : 0, kidId);
 
-    return { id, ...reward };
+    return { id, ...reward, kidId };
   },
 
   update(id: string, updates: Partial<Reward>): Reward | null {
@@ -719,13 +754,16 @@ export const RewardsDB = {
 
     const updated = { ...current, ...updates };
 
+    // Convert empty string to null for kid_id
+    const kidId = updated.kidId && updated.kidId.trim() !== '' ? updated.kidId : null;
+
     db.prepare(`
       UPDATE rewards
       SET title = ?, description = ?, points_cost = ?, icon = ?, available = ?, kid_id = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `).run(updated.title, updated.description, updated.pointsCost, updated.icon, updated.available ? 1 : 0, updated.kidId, id);
+    `).run(updated.title, updated.description, updated.pointsCost, updated.icon, updated.available ? 1 : 0, kidId, id);
 
-    return updated;
+    return { ...updated, kidId };
   },
 
   delete(id: string): boolean {
