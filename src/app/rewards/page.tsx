@@ -104,7 +104,13 @@ export default function RewardsPage() {
                 onClick={() => setSelectedKid(kid)}
                 className="bg-white rounded-2xl p-8 shadow-xl hover:shadow-2xl transition-all transform hover:scale-105"
               >
-                <div className="text-6xl mb-4">{kid.avatar}</div>
+                <div className="text-6xl mb-4 flex justify-center">
+                  {kid.avatar && kid.avatar.startsWith('data:') ? (
+                    <img src={kid.avatar} alt={kid.name} className="w-24 h-24 rounded-full object-cover border-4 border-purple-300" />
+                  ) : (
+                    <span>{kid.avatar}</span>
+                  )}
+                </div>
                 <h2 className="text-2xl font-bold mb-2">{kid.name}</h2>
                 <div className="flex items-center justify-center gap-2 text-purple-600">
                   <Coins className="w-6 h-6" />
@@ -141,7 +147,11 @@ export default function RewardsPage() {
             Back
           </button>
           <div className="bg-white rounded-full px-6 py-3 shadow-lg flex items-center gap-3">
-            <span className="text-2xl">{selectedKid.avatar}</span>
+            {selectedKid.avatar && selectedKid.avatar.startsWith('data:') ? (
+              <img src={selectedKid.avatar} alt={selectedKid.name} className="w-10 h-10 rounded-full object-cover" />
+            ) : (
+              <span className="text-2xl">{selectedKid.avatar}</span>
+            )}
             <div>
               <div className="font-bold">{selectedKid.name}</div>
               <div className="flex items-center gap-2 text-purple-600">
@@ -175,11 +185,15 @@ export default function RewardsPage() {
                   }`}
                 >
                   <div className="text-5xl mb-4 text-center flex justify-center">
-                    {reward.icon && reward.icon.startsWith('data:') ? (
-                      <img src={reward.icon} alt={reward.title} className="w-16 h-16 rounded object-cover" />
-                    ) : (
-                      <span>{reward.icon || '🎁'}</span>
-                    )}
+                    {(() => {
+                      const icon = reward.icon || '🎁';
+                      // Check if it's a base64 image (starts with data:image or just data:)
+                      if (typeof icon === 'string' && (icon.startsWith('data:image') || (icon.startsWith('data:') && icon.includes('base64')))) {
+                        return <img src={icon} alt={reward.title} className="w-20 h-20 rounded-lg object-cover border-2 border-purple-200" />;
+                      }
+                      // Otherwise show as emoji/text
+                      return <span>{icon}</span>;
+                    })()}
                   </div>
                   <h3 className="text-xl font-bold mb-2 text-center">{reward.title}</h3>
                   {reward.description && (

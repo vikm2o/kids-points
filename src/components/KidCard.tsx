@@ -1,7 +1,8 @@
 'use client';
 
-import { Kid, RoutineItem } from '@/types';
-import { Star, Clock, Target, Monitor } from 'lucide-react';
+import { Kid, RoutineItem, Redemption, Reward } from '@/types';
+import { Star, Clock, Target, Monitor, Gift } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 interface KidCardProps {
   kid: Kid;
@@ -9,6 +10,44 @@ interface KidCardProps {
 }
 
 export function KidCard({ kid, nextItem }: KidCardProps) {
+  const [redemptions, setRedemptions] = useState<(Redemption & { reward?: Reward })[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadRedemptions = async () => {
+      try {
+        const response = await fetch(`/api/redemptions?kidId=${kid.id}`);
+        if (response.ok) {
+          const data = await response.json();
+
+          // Fetch reward details for each redemption
+          const redemptionsWithRewards = await Promise.all(
+            data.map(async (redemption: Redemption) => {
+              try {
+                const rewardResponse = await fetch(`/api/rewards/${redemption.rewardId}`);
+                if (rewardResponse.ok) {
+                  const reward = await rewardResponse.json();
+                  return { ...redemption, reward };
+                }
+              } catch (error) {
+                console.error('Failed to load reward:', error);
+              }
+              return redemption;
+            })
+          );
+
+          setRedemptions(redemptionsWithRewards);
+        }
+      } catch (error) {
+        console.error('Failed to load redemptions:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadRedemptions();
+  }, [kid.id]);
+
   return (
     <div className="bg-white rounded-2xl shadow-lg p-6 trml:p-8 dashboard-card">
       {/* Kid Info */}
@@ -70,7 +109,7 @@ export function KidCard({ kid, nextItem }: KidCardProps) {
 
       {/* Next Item */}
       {nextItem && (
-        <div className="bg-gradient-to-r from-blue-100 to-purple-100 rounded-xl p-4">
+        <div className="bg-gradient-to-r from-blue-100 to-purple-100 rounded-xl p-4 mb-4">
           <div className="flex items-center gap-2 mb-2">
             <Clock className="w-5 h-5 text-blue-600" />
             <span className="font-medium text-blue-800">Up Next</span>
@@ -86,6 +125,73 @@ export function KidCard({ kid, nextItem }: KidCardProps) {
           </div>
         </div>
       )}
+
+      {/* Redemption History */}
+      <div className="border-t pt-4 mt-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Gift className="w-5 h-5 text-purple-600" />
+          <span className="font-semibold text-gray-800">Recent Rewards</span>
+        </div>
+
+        {loading ? (
+          <div className="text-center py-3 text-gray-500 text-sm">Loading...</div>
+        ) : redemptions.length === 0 ? (
+          <div className="text-center py-3 text-gray-500 text-sm">
+            No rewards redeemed yet
+          </div>
+        ) : (
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {redemptions.slice(0, 5).map((redemption) => (
+              <div
+                key={redemption.id}
+                className="bg-purple-50 rounded-lg p-3 border border-purple-100"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      {redemption.reward?.icon && (
+                        <span className="text-xl flex-shrink-0">
+                          {redemption.reward.icon.startsWith('data:') ? (
+                            <img
+                              src={redemption.reward.icon}
+                              alt=""
+                              className="w-6 h-6 rounded object-cover"
+                            />
+                          ) : (
+                            redemption.reward.icon
+                          )}
+                        </span>
+                      )}
+                      <span className="font-medium text-gray-800 text-sm truncate">
+                        {redemption.reward?.title || 'Unknown Reward'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-xs text-gray-600">
+                        {new Date(redemption.redeemedAt).toLocaleDateString()}
+                      </span>
+                      <span className="text-xs font-semibold text-purple-700">
+                        -{redemption.pointsSpent} pts
+                      </span>
+                    </div>
+                  </div>
+                  <span
+                    className={`text-xs px-2 py-1 rounded-full flex-shrink-0 ${
+                      redemption.status === 'completed'
+                        ? 'bg-green-100 text-green-700'
+                        : redemption.status === 'approved'
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-yellow-100 text-yellow-700'
+                    }`}
+                  >
+                    {redemption.status}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

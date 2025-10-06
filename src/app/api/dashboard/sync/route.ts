@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { KidsDB, DevicesDB, RewardsDB, getTodayRoutines, getNextRoutineItem, getTodayPoints, getTodayTotalPoints, getAvailablePoints, checkAndResetIfNeeded } from '@/lib/database';
+import { KidsDB, DevicesDB, RewardsDB, RedemptionsDB, getTodayRoutines, getNextRoutineItem, getTodayPoints, getTodayTotalPoints, getAvailablePoints, checkAndResetIfNeeded } from '@/lib/database';
 import { TerminusPayload } from '@/types';
 import axios from 'axios';
 
@@ -68,6 +68,9 @@ export async function POST(request: NextRequest) {
     const routines = getTodayRoutines(kidId);
     const nextItem = getNextRoutineItem(kidId);
     const rewards = RewardsDB.getAvailableForKid(kidId);
+    const redemptions = RedemptionsDB.getByKidId(kidId);
+    const lastRedemption = redemptions.length > 0 ? redemptions[0] : null;
+    const lastRedemptionReward = lastRedemption ? RewardsDB.getById(lastRedemption.rewardId) : null;
 
     // Calculate points dynamically
     const todayTotalPoints = getTodayTotalPoints(kidId); // Max possible points today
@@ -84,7 +87,7 @@ export async function POST(request: NextRequest) {
     console.log('============================');
 
     // Generate HTML content for the dashboard
-    const htmlContent = generateDashboardHTML(kid, routines, nextItem, rewards, todayTotalPoints, todayEarnedPoints);
+    const htmlContent = generateDashboardHTML(kid, routines, nextItem, rewards, todayTotalPoints, todayEarnedPoints, lastRedemptionReward);
 
     // Create screen - the /api/screens endpoint will handle playlist updates automatically
     const screenResponse = await createScreen(device, kid, htmlContent);
@@ -113,7 +116,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function generateDashboardHTML(kid: any, routines: any[], nextItem: any, rewards: any[], todayTotalPoints: number, todayEarnedPoints: number) {
+function generateDashboardHTML(kid: any, routines: any[], nextItem: any, rewards: any[], todayTotalPoints: number, todayEarnedPoints: number, lastRedemption: any) {
   const now = new Date();
   const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -133,27 +136,27 @@ function generateDashboardHTML(kid: any, routines: any[], nextItem: any, rewards
     return `${hours12}:${paddedMins} ${period}`;
   };
 
-  // Get top 3 affordable rewards sorted by cost, or next 3 if none affordable
+  // Get top 3 rewards: affordable ones first, then others to fill up to 3
   const availablePoints = kid.lifetimePoints - kid.redeemedPoints;
-  let topRewards = rewards
+  const affordableRewards = rewards
     .filter((r: any) => r.pointsCost <= availablePoints)
-    .sort((a: any, b: any) => a.pointsCost - b.pointsCost)
-    .slice(0, 3);
+    .sort((a: any, b: any) => a.pointsCost - b.pointsCost);
 
-  // If no affordable rewards, show the 3 cheapest ones as goals
-  if (topRewards.length === 0) {
-    topRewards = rewards
-      .sort((a: any, b: any) => a.pointsCost - b.pointsCost)
-      .slice(0, 3);
-  }
+  const unaffordableRewards = rewards
+    .filter((r: any) => r.pointsCost > availablePoints)
+    .sort((a: any, b: any) => a.pointsCost - b.pointsCost);
+
+  // Combine: affordable first, then unaffordable, limit to 3 total
+  const topRewards = [...affordableRewards, ...unaffordableRewards].slice(0, 3);
 
   return `
 <div class="layout">
   <div>
-    <h1>${kid.name} — ${dateStr}</h1>
+    <h1 style="font-size: 1.5em;">${kid.name} — ${dateStr}</h1>
   </div>
 
-  <h2>Summary &amp; Rewards</h2>
+  <h2 style="font-size: 1.3em;">Summary &amp; Rewards</h2>
+  ${lastRedemption ? `<p style="margin: -0.5em 0 0.5em 0; font-size: 0.9em; font-weight: bold; opacity: 0.85;">Last redeemed: ${lastRedemption.title}</p>` : ''}
   <table class="table" data-table-limit="true">
     <thead>
       <tr>
@@ -167,7 +170,7 @@ function generateDashboardHTML(kid: any, routines: any[], nextItem: any, rewards
       <tr>
         <td><span class="value">${todayTotalPoints}</span></td>
         <td><span class="value">${todayEarnedPoints}</span></td>
-        <td><span class="value">${kid.lifetimePoints}</span></td>
+        <td><span class="value">${availablePoints}</span></td>
         ${topRewards.length > 0 ? topRewards.map((reward: any) => `
         <td><span class="title">${reward.title} (${reward.pointsCost})</span></td>
         `).join('') : `
@@ -177,7 +180,7 @@ function generateDashboardHTML(kid: any, routines: any[], nextItem: any, rewards
     </tbody>
   </table>
 
-  <h2>Today's Actions</h2>
+  <h2 style="font-size: 1.3em;">Today's Actions</h2>
   <table class="table" data-table-limit="true" data-table-max-height="auto">
     <thead>
       <tr>

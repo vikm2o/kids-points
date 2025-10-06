@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
       kidId,
       rewardId,
       pointsSpent: reward.pointsCost,
-      status: 'pending'
+      status: 'completed'
     });
 
     // Add to redeemed points

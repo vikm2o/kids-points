@@ -1,6 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { RewardsDB } from '@/lib/database';
 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { id } = params;
+    const reward = RewardsDB.getById(id);
+
+    if (!reward) {
+      return NextResponse.json(
+        { error: 'Reward not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(reward);
+  } catch (error) {
+    console.error('Failed to get reward:', error);
+    return NextResponse.json(
+      { error: 'Failed to get reward' },
+      { status: 500 }
+    );
+  }
+}
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
