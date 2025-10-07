@@ -71,7 +71,7 @@ export function KidCard({ kid, nextItem }: KidCardProps) {
             <div className="flex items-center gap-2">
               <Star className="w-6 h-6 text-yellow-600" />
               <span className="text-lg font-medium text-yellow-800">
-                Lifetime Points
+                Available Points
               </span>
             </div>
             <span className="text-2xl trml:text-3xl font-bold text-yellow-800">

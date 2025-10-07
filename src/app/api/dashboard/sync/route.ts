@@ -171,7 +171,7 @@ function generateDashboardHTML(kid: any, routines: any[], nextItem: any, rewards
       <tr>
         <th><span class="title">Today</span></th>
         <th><span class="title">Earned</span></th>
-        <th><span class="title">Lifetime</span></th>
+        <th><span class="title">Available</span></th>
         ${topRewards.map((_: any, idx: number) => `<th><span class="title">Reward ${idx + 1}</span></th>`).join('')}
       </tr>
     </thead>
