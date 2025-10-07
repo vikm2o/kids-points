@@ -35,8 +35,29 @@ export function Dashboard() {
     loadData();
   }, []);
 
+  // Callback to refresh data when date changes
+  const refreshDashboardData = async () => {
+    console.log('[Dashboard] Refreshing data after date change...');
+    try {
+      const refreshedKids = await getAllKids();
+      const refreshedCurrentKid = currentKid ? refreshedKids.find(k => k.id === currentKid.id) : null;
+      const refreshedRoutines = currentKid ? await getTodayRoutines(currentKid.id) : [];
+      const refreshedNextItem = currentKid ? await getNextRoutineItem(currentKid.id) : null;
+
+      setKids(refreshedKids);
+      if (refreshedCurrentKid) {
+        setCurrentKid(refreshedCurrentKid);
+      }
+      setRoutines(refreshedRoutines);
+      setNextItem(refreshedNextItem);
+      console.log('[Dashboard] Data refreshed successfully');
+    } catch (error) {
+      console.error('[Dashboard] Failed to refresh data:', error);
+    }
+  };
+
   // Terminus integration
-  useTerminus(currentKid, routines, nextItem);
+  useTerminus(currentKid, routines, nextItem, refreshDashboardData);
 
   useEffect(() => {
     const timer = setInterval(() => {

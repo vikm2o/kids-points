@@ -467,8 +467,8 @@ export function getTodayRoutines(kidId: string): RoutineItem[] {
 // Reset all routines completion status (call this at start of new day)
 export function resetDailyRoutines() {
   const db = getDatabase();
-  db.prepare('UPDATE routines SET completed = FALSE, completed_date = NULL WHERE date_override IS NULL').run();
-  console.log('Daily routines reset for new day');
+  const result = db.prepare('UPDATE routines SET completed = FALSE, completed_date = NULL WHERE date_override IS NULL').run();
+  console.log(`[Daily Reset] Daily routines reset for new day. ${result.changes} routines were reset.`);
 }
 
 // Check if we need to reset routines and do so if it's a new day
@@ -512,7 +512,7 @@ export function checkAndResetIfNeeded() {
 
   // If it's a new day, reset routines
   if (lastResetDate !== today) {
-    console.log(`New day detected (last reset: ${lastResetDate || 'never'}, today: ${today}). Resetting daily routines...`);
+    console.log(`[Daily Reset] New day detected (last reset: ${lastResetDate || 'never'}, today: ${today}). Resetting daily routines...`);
     resetDailyRoutines();
 
     // Update last reset date
@@ -520,6 +520,9 @@ export function checkAndResetIfNeeded() {
       INSERT OR REPLACE INTO settings (key, value, updated_at)
       VALUES (?, ?, CURRENT_TIMESTAMP)
     `).run('last_reset_date', today);
+    console.log(`[Daily Reset] Last reset date updated to: ${today}`);
+  } else {
+    console.log(`[Daily Reset] No reset needed. Current date: ${today}, Last reset: ${lastResetDate}`);
   }
 }
 
