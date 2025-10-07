@@ -11,6 +11,7 @@ import { DeviceSettings } from '@/components/DeviceSettings';
 import { DeviceAssignments } from '@/components/DeviceAssignments';
 import { RewardsManager } from '@/components/RewardsManager';
 import { PointsAdjustment } from '@/components/PointsAdjustment';
+import { SystemSettings } from '@/components/SystemSettings';
 import { isAuthenticated, logout } from '@/lib/auth';
 
 export default function AdminPage() {
@@ -258,6 +259,9 @@ export default function AdminPage() {
             </button>
           </div>
         </div>
+
+        {/* System Settings */}
+        <SystemSettings />
 
         {/* Device Assignments */}
         <DeviceAssignments kids={kids} onSyncKid={syncKidToDevice} onSyncDashboard={syncDashboardToDevice} />

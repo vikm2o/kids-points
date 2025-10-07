@@ -2,9 +2,10 @@
 
 import { useEffect, useCallback, useRef } from 'react';
 import { Kid, RoutineItem } from '@/types';
+import { getTimezone, getTodayDate } from '@/lib/timezone';
 
 export function useTerminus(kid: Kid | null, routines: RoutineItem[], nextItem: RoutineItem | null) {
-  const lastSyncDateRef = useRef<string>(new Date().toDateString());
+  const lastSyncDateRef = useRef<string>('');
 
   const updateTerminus = useCallback(async () => {
     if (!kid) {
@@ -38,26 +39,24 @@ export function useTerminus(kid: Kid | null, routines: RoutineItem[], nextItem: 
     }
   }, [kid, routines, nextItem, updateTerminus]);
 
-  // Set up periodic updates every 30 seconds
-  useEffect(() => {
-    if (kid) {
-      const interval = setInterval(updateTerminus, 30000);
-      return () => clearInterval(interval);
-    }
-  }, [kid, updateTerminus]);
-
   // Check for date change and sync
   useEffect(() => {
     if (!kid) return;
 
-    const checkDateChange = () => {
-      const currentDate = new Date().toDateString();
+    const checkDateChange = async () => {
+      const tz = await getTimezone();
+      const currentDate = getTodayDate(tz);
       if (currentDate !== lastSyncDateRef.current) {
         console.log('Date changed, syncing dashboard...');
         lastSyncDateRef.current = currentDate;
         updateTerminus();
       }
     };
+
+    // Initialize the ref with current date
+    getTimezone().then(tz => {
+      lastSyncDateRef.current = getTodayDate(tz);
+    });
 
     // Check every hour for date change
     const dateCheckInterval = setInterval(checkDateChange, 3600000);

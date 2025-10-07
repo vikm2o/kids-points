@@ -2,7 +2,8 @@
 
 import { RoutineItem } from '@/types';
 import { CheckCircle, Circle, Clock, Star, Minus } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { getTimezone, getCurrentTime } from '@/lib/timezone';
 
 interface RoutineListProps {
   routines: RoutineItem[];
@@ -12,10 +13,27 @@ interface RoutineListProps {
 }
 
 export function RoutineList({ routines, nextItem, onToggleComplete, onReducePoints }: RoutineListProps) {
-  const now = new Date();
-  const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+  const [timezone, setTimezone] = useState('UTC');
+  const [currentTime, setCurrentTime] = useState('00:00');
   const [showReduceModal, setShowReduceModal] = useState<string | null>(null);
   const [reduceReason, setReduceReason] = useState('');
+
+  useEffect(() => {
+    const loadTimezone = async () => {
+      const tz = await getTimezone();
+      setTimezone(tz);
+      setCurrentTime(getCurrentTime(tz));
+    };
+    loadTimezone();
+
+    const interval = setInterval(() => {
+      getTimezone().then(tz => {
+        setCurrentTime(getCurrentTime(tz));
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const getItemStatus = (item: RoutineItem) => {
     if (item.completed) return 'completed';

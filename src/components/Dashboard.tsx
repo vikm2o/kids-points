@@ -6,6 +6,7 @@ import { getAllKids, getTodayRoutines, getNextRoutineItem, toggleRoutineCompleti
 import { KidCard } from './KidCard';
 import { RoutineList } from './RoutineList';
 import { useTerminus } from '@/hooks/useTerminus';
+import { getTimezone, formatTime } from '@/lib/timezone';
 import { Clock, Star, Gift } from 'lucide-react';
 
 export function Dashboard() {
@@ -14,13 +15,16 @@ export function Dashboard() {
   const [routines, setRoutines] = useState<RoutineItem[]>([]);
   const [nextItem, setNextItem] = useState<RoutineItem | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [timezone, setTimezone] = useState('UTC');
 
   // Load initial data
   useEffect(() => {
     const loadData = async () => {
       try {
         const loadedKids = await getAllKids();
+        const tz = await getTimezone();
         setKids(loadedKids);
+        setTimezone(tz);
         if (loadedKids.length > 0) {
           setCurrentKid(loadedKids[0]);
         }
@@ -133,10 +137,7 @@ export function Dashboard() {
             <div className="flex items-center gap-2 text-gray-600">
               <Clock className="w-5 h-5" />
               <span className="text-lg trml:text-xl font-mono">
-                {currentTime.toLocaleTimeString([], {
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })}
+                {formatTime(currentTime, timezone)}
               </span>
             </div>
           </div>

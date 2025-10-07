@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { KidsDB, DevicesDB, RewardsDB, RedemptionsDB, getTodayRoutines, getNextRoutineItem, getTodayPoints, getTodayTotalPoints, getAvailablePoints, checkAndResetIfNeeded } from '@/lib/database';
+import { KidsDB, DevicesDB, RewardsDB, RedemptionsDB, getTodayRoutines, getNextRoutineItem, getTodayPoints, getTodayTotalPoints, getAvailablePoints, checkAndResetIfNeeded, getDatabase } from '@/lib/database';
 import { TerminusPayload } from '@/types';
 import axios from 'axios';
 
@@ -117,11 +117,20 @@ export async function POST(request: NextRequest) {
 }
 
 function generateDashboardHTML(kid: any, routines: any[], nextItem: any, rewards: any[], todayTotalPoints: number, todayEarnedPoints: number, lastRedemption: any) {
-  const now = new Date();
-  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const dayOfWeek = dayNames[now.getDay()];
-  const dateStr = `${dayOfWeek}, ${now.getDate()} ${monthNames[now.getMonth()]} ${now.getFullYear()}`;
+  // Get timezone from settings
+  const db = getDatabase();
+  const timezoneRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('timezone') as { value: string } | undefined;
+  const timezone = timezoneRow?.value || 'UTC';
+
+  // Get current date/time in the configured timezone
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    weekday: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
+  const dateStr = formatter.format(new Date());
 
   // Helper function to convert 24-hour time to 12-hour AM/PM format
   const formatTime12Hour = (time24: string): string => {

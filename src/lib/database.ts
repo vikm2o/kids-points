@@ -417,9 +417,36 @@ export const RoutinesDB = {
 
 // Helper functions
 export function getTodayRoutines(kidId: string): RoutineItem[] {
+  const db = getDatabase();
+
+  // Get timezone from settings
+  const timezoneRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('timezone') as { value: string } | undefined;
+  const timezone = timezoneRow?.value || 'UTC';
+
+  // Get today's date and day of week in the configured timezone
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    weekday: 'short'
+  });
+
+  const parts = formatter.formatToParts(new Date());
+  const partsMap: Record<string, string> = {};
+  parts.forEach(part => {
+    if (part.type !== 'literal') {
+      partsMap[part.type] = part.value;
+    }
+  });
+
+  const todayISO = `${partsMap.year}-${partsMap.month}-${partsMap.day}`; // YYYY-MM-DD
+
+  // Get day of week (0-6) in the configured timezone
   const now = new Date();
-  const todayDow = now.getDay();
-  const todayISO = now.toISOString().slice(0, 10);
+  const tzDate = new Date(now.toLocaleString('en-US', { timeZone: timezone }));
+  const todayDow = tzDate.getDay();
+
   const routines = RoutinesDB.getByKidId(kidId);
 
   // Filter to only include:
@@ -457,7 +484,27 @@ export function checkAndResetIfNeeded() {
     )
   `);
 
-  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  // Get timezone from settings
+  const timezoneRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('timezone') as { value: string } | undefined;
+  const timezone = timezoneRow?.value || 'UTC';
+
+  // Get today's date in the configured timezone
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+
+  const parts = formatter.formatToParts(new Date());
+  const partsMap: Record<string, string> = {};
+  parts.forEach(part => {
+    if (part.type !== 'literal') {
+      partsMap[part.type] = part.value;
+    }
+  });
+
+  const today = `${partsMap.year}-${partsMap.month}-${partsMap.day}`; // YYYY-MM-DD
 
   // Get last reset date
   const lastResetRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('last_reset_date') as { value: string } | undefined;
@@ -478,8 +525,16 @@ export function checkAndResetIfNeeded() {
 
 export function getNextRoutineItem(kidId: string): RoutineItem | null {
   const todayRoutines = getTodayRoutines(kidId);
+  const db = getDatabase();
+
+  // Get timezone from settings
+  const timezoneRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('timezone') as { value: string } | undefined;
+  const timezone = timezoneRow?.value || 'UTC';
+
+  // Get current time in the configured timezone
   const now = new Date();
-  const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+  const tzDate = new Date(now.toLocaleString('en-US', { timeZone: timezone }));
+  const currentTime = `${tzDate.getHours().toString().padStart(2, '0')}:${tzDate.getMinutes().toString().padStart(2, '0')}`;
 
   const nextItem = todayRoutines
     .filter(item => !item.completed && item.time >= currentTime)
