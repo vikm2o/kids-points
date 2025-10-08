@@ -16,9 +16,11 @@ export function Dashboard() {
   const [nextItem, setNextItem] = useState<RoutineItem | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [timezone, setTimezone] = useState('UTC');
+  const [isMounted, setIsMounted] = useState(false);
 
   // Load initial data
   useEffect(() => {
+    setIsMounted(true);
     const loadData = async () => {
       try {
         const loadedKids = await getAllKids();
@@ -158,7 +160,7 @@ export function Dashboard() {
             <div className="flex items-center gap-2 text-gray-600">
               <Clock className="w-5 h-5" />
               <span className="text-lg trml:text-xl font-mono">
-                {formatTime(currentTime, timezone)}
+                {isMounted ? formatTime(currentTime, timezone) : '--:--'}
               </span>
             </div>
           </div>
