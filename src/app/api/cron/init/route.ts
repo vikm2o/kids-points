@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
-import { startScreenCleanupCron } from '@/lib/cron';
+import { startScreenCleanupCron, startDailyResetCron } from '@/lib/cron';
 
 // This endpoint is called once when the app starts to initialize cron jobs
 export async function POST() {
   try {
     startScreenCleanupCron();
+    startDailyResetCron();
 
     return NextResponse.json({
       success: true,
-      message: 'Cron jobs initialized successfully'
+      message: 'Cron jobs initialized successfully (cleanup at 2 AM, daily reset at midnight)'
     });
   } catch (error) {
     console.error('Failed to initialize cron jobs:', error);
