@@ -59,7 +59,7 @@ export function Dashboard() {
   };
 
   // Terminus integration
-  useTerminus(currentKid, routines, nextItem, refreshDashboardData);
+  const { updateTerminus } = useTerminus(currentKid, routines, nextItem, refreshDashboardData);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -103,6 +103,9 @@ export function Dashboard() {
         }
         setRoutines(refreshedRoutines);
         setNextItem(refreshedNextItem);
+
+        // Explicitly sync to Terminus display
+        await updateTerminus();
       }
     } catch (error) {
       console.error('Failed to toggle routine:', error);
@@ -132,6 +135,9 @@ export function Dashboard() {
         }
         setRoutines(refreshedRoutines);
         setNextItem(refreshedNextItem);
+
+        // Explicitly sync to Terminus display
+        await updateTerminus();
       }
     } catch (error) {
       console.error('Failed to reduce points:', error);
